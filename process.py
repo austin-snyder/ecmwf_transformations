@@ -3,7 +3,7 @@ import re
 import pathlib
 import os
 
-def average_netcdfs_in_dir(variables, periods):
+def average_netcdfs(variables, periods):
     """
     Calculate the monthly mean for specified variables in NetCDF files.
 

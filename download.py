@@ -1,8 +1,8 @@
 import os
 import pathlib
-
 import cdsapi
-
+import sys
+import contextlib
 
 def batch_download(variables, years, months):
     """
@@ -129,11 +129,12 @@ def api_request(variables, year, month, days, times):
 
     period = download_period([year], [month], days, times)
 
-    print(f'Downloading data from: {period[0]}-{period[1]}-{period[2]} to {period[3]}-{period[4]}-{period[5]}.')
     period = f'{period[0]}{period[1]}{period[2]}_to_{period[3]}{period[4]}{period[5]}'
     filename = f'download_{period}'
 
-    client = cdsapi.Client()
+    # Silence the output of loading the CDSAPI
+    with open(os.devnull, 'w') as fnull, contextlib.redirect_stdout(fnull), contextlib.redirect_stderr(fnull):
+        client = cdsapi.Client()
 
     variable_list = '-'.join(map(str, variables))
     output_dir = os.path.join('.', 'era5_data', f'{variable_list}', 'downloads')
@@ -145,6 +146,7 @@ def api_request(variables, year, month, days, times):
         print(f"Data for the period {period} has already been downloaded.")
     else:
         os.makedirs(output_dir, exist_ok=True)
+        print(f'Downloading data from: {period[0]}-{period[1]}-{period[2]} to {period[3]}-{period[4]}-{period[5]}.')
         client.retrieve(dataset, request).download(output_location)
         print(f"Data for the period {period} has been downloaded.")
 
