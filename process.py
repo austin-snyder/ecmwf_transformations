@@ -18,7 +18,7 @@ def average_netcdfs(variables, periods):
     variable_list = '-'.join(map(str, variables))
     directory_path = pathlib.Path(f'./era5_data/{variable_list}/')
     input_directory = pathlib.Path(f'./era5_data/{variable_list}/downloads/')
-    output_directory = pathlib.Path(f'./era5_data/{variable_list}/means/')
+    output_directory = pathlib.Path(f'./era5_data/{variable_list}/monthly_means/')
 
     # Loop through all files in the directory
     for file in input_directory.iterdir():

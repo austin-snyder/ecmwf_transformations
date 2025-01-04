@@ -17,8 +17,8 @@ def netcdf_to_geotiff(variables, periods):
     # Open NetCDF files and average them
     variable_list = '-'.join(map(str, variables))
     directory_path = pathlib.Path(f'./era5_data/{variable_list}')
-    input_directory = pathlib.Path(f'{directory_path}/means/')
-    output_directory = pathlib.Path(f'{directory_path}/means/geotiffs/')
+    input_directory = pathlib.Path(f'{directory_path}/monthly_means/')
+    output_directory = pathlib.Path(f'{directory_path}/monthly_means/geotiffs/')
     
     data_list = []
     for file in input_directory.iterdir():
