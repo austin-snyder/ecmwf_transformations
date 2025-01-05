@@ -4,7 +4,7 @@ import os
 import pathlib
 
 
-def netcdf_to_geotiff(variables, periods):
+def netcdf_to_geotiff(variables, periods, input_dir):
     """
     Convert NetCDF file to GeoTIFF format.
 
@@ -17,36 +17,44 @@ def netcdf_to_geotiff(variables, periods):
     # Open NetCDF files and average them
     variable_list = '-'.join(map(str, variables))
     directory_path = pathlib.Path(f'./era5_data/{variable_list}')
-    input_directory = pathlib.Path(f'{directory_path}/monthly_means/')
-    output_directory = pathlib.Path(f'{directory_path}/monthly_means/geotiffs/')
-    
-    data_list = []
-    for file in input_directory.iterdir():
-        if file.name.endswith(".nc"):
-            input_path = input_directory / file.name
-            input_path_stem = str(input_path.stem)
-            input_path_stem_period = input_path_stem.split("mean_")[1]
+    input_directory = pathlib.Path(f'{directory_path}/{input_dir}/')
+    output_directory = pathlib.Path(f'{directory_path}/{input_dir}/geotiffs/')
 
-            if input_path_stem_period in periods:
-                data = xr.open_dataset(str(input_path))
+    for period in periods:
+        month = period[4:6]
+        # Month Check
+        if month == "":
+            input_path_suffix = f"{period}"
+        else:
+            input_path_suffix = f"month{month}_{period}"
+        
+        # Anomaly Check
+        if input_dir == "monthly_anomalies":
+            input_path_name = f"anomaly_{input_path_suffix}"
+        elif input_dir == "monthly_means":
+            input_path_name = f"mean_{input_path_suffix}"
 
-                # Shift the longitude values
-                data.coords['longitude'] = (data.coords['longitude'] + 180) % 360 - 180
-                data = data.sortby(data.longitude)
+        input_path = input_directory / input_path_name
 
-                # Select the variable to export
-                variable = data["ssrd"]
+        data = xr.open_dataset(str(input_path) + ".nc")
 
-                # Set spatial reference
-                variable = variable.rio.write_crs("EPSG:4326")  # Replace with your CRS if known
+        # Shift the longitude values
+        data.coords['longitude'] = (data.coords['longitude'] + 180) % 360 - 180
+        data = data.sortby(data.longitude)
 
-                os.makedirs(output_directory, exist_ok=True)
-                output_path = output_directory / f"{input_path_stem}.tif"
-                # Check if output file exists
-                if output_path.exists():
-                    print(f"Data for the period {input_path_stem_period} has already been converted.")
-                    continue
+        # Select the variable to export
+        variable = data["ssrd"]
 
-                # Export to GeoTIFF
-                variable.rio.to_raster(output_path)
-                print("GeoTIFF file created successfully!")
+        # Set spatial reference
+        variable = variable.rio.write_crs("EPSG:4326")  # Replace with your CRS if known
+
+        os.makedirs(output_directory, exist_ok=True)
+        output_path = output_directory / f"{input_path_name}.tif"
+        # Check if output file exists
+        if output_path.exists():
+            print(f"Data for the period {period} has already been converted.")
+            continue
+
+        # Export to GeoTIFF
+        variable.rio.to_raster(output_path)
+        print("GeoTIFF file created successfully!")

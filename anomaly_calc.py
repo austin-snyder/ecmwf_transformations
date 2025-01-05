@@ -1,50 +1,66 @@
-import netCDF4 as nc
-import numpy as np
+import xarray as xr
+import pathlib
 import os
 
-def calculate_percentage_difference(long_term_avg_file, monthly_mean_file, output_file):
+def calculate_anomaly(variables, periods, months):
     """
     Calculate the percentage difference from the long-term norm for a given month.
 
     Parameters:
-        long_term_avg_file (str): Path to the long-term average NetCDF file.
-        monthly_mean_file (str): Path to the monthly mean NetCDF file.
-        output_file (str): Path to save the output NetCDF file with percentage differences.
+        variables (list): List of variables to calculate the percentage difference for.
+        output_file (str): Path to the output NetCDF file.
 
     Returns:
         None
     """
-    # Open the NetCDF files
-    with nc.Dataset(long_term_avg_file, 'r') as long_term_avg, nc.Dataset(monthly_mean_file, 'r') as monthly_mean:
+
+    # Directory path
+    variable_list = '-'.join(map(str, variables))
+    long_term_directory = pathlib.Path(f'./era5_data/{variable_list}/long-term_averages/')
+    monthly_directory = pathlib.Path(f'./era5_data/{variable_list}/monthly_means/')
+    output_directory = pathlib.Path(f'./era5_data/{variable_list}/monthly_anomalies/')
+    
+    multi_anomaly(periods, long_term_directory, monthly_directory, output_directory)
+         
+    
+
+def multi_anomaly(periods, longterm_directory, monthly_directory, anomaly_directory):
+    for period in periods:
+        month = period[4:6]
+
+        anomaly_path_stem = f"anomaly_{period}"
+        anomaly_path = anomaly_directory / f"{anomaly_path_stem}.nc"
+
+        monthly_path_stem = f"mean_{period}"
+        monthly_path = monthly_directory / f"{monthly_path_stem}.nc"
+
+        longterm_path_stem = f"lt_average_{month}"
+        longterm_path = longterm_directory / f"{longterm_path_stem}.nc"
+
+        if (month == ""):
+            longterm_path = os.path.join(longterm_directory, "lt_average.nc")
+            output_file_path = os.path.join(anomaly_directory, f"anomaly_year_{period}.nc")
+        else:
+            longterm_path = os.path.join(longterm_directory, f"lt_average_{month}.nc")
+            output_file_path = os.path.join(anomaly_directory, f"anomaly_month{month}_{period}.nc")
+
+
+        # Open the NetCDF files using xarray
+        longterm_avg = xr.open_dataset(longterm_path)
+        monthly_mean = xr.open_dataset(monthly_path)
+
         # Read the data variables
-        long_term_avg_data = long_term_avg.variables['data'][:]
-        monthly_mean_data = monthly_mean.variables['data'][:]
+        longterm_avg_data = longterm_avg['ssrd']
+        monthly_mean_data = monthly_mean['ssrd']
 
         # Calculate the percentage difference
-        percentage_difference = ((monthly_mean_data - long_term_avg_data) / long_term_avg_data) * 100
+        anomaly = ((monthly_mean_data - longterm_avg_data) / longterm_avg_data) * 100
 
         # Create the output NetCDF file
-        with nc.Dataset(output_file, 'w', format='NETCDF4') as output:
-            # Copy dimensions from the long-term average file
-            for name, dimension in long_term_avg.dimensions.items():
-                output.createDimension(name, len(dimension) if not dimension.isunlimited() else None)
+        anomaly.to_netcdf(output_file_path)
 
-            # Copy variables from the long-term average file
-            for name, variable in long_term_avg.variables.items():
-                out_var = output.createVariable(name, variable.datatype, variable.dimensions)
-                out_var.setncatts({k: variable.getncattr(k) for k in variable.ncattrs()})
-                if name == 'data':
-                    out_var[:] = percentage_difference
-                else:
-                    out_var[:] = variable[:]
+        # Add a new attribute to indicate the data represents percentage differences
+        #with xr.open_dataset(output_file, mode='a') as output:
+        #    output.attrs['description'] = 'Percentage difference from long-term average'
 
-            # Add a new attribute to indicate the data represents percentage differences
-            output.setncattr('description', 'Percentage difference from long-term average')
-
-if __name__ == "__main__":
-    long_term_avg_file = 'path/to/long_term_avg.nc'
-    monthly_mean_file = 'path/to/monthly_mean.nc'
-    output_file = 'path/to/output_percentage_difference.nc'
-
-    calculate_percentage_difference(long_term_avg_file, monthly_mean_file, output_file)
-    print(f"Percentage difference calculated and saved to {output_file}")
+        print(f"Percentage difference saved to {output_file_path}")

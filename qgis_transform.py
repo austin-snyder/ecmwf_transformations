@@ -24,7 +24,7 @@ from PyQt5.QtGui import QImage, QPainter, QColor
 from PyQt5.QtCore import QSize, Qt
 
 
-def init_qgis(variables, periods):
+def init_qgis(variables, periods, months, input_dir):
     """
     Initialize the QGIS application.
 
@@ -47,18 +47,26 @@ def init_qgis(variables, periods):
         # Load the raster
         variable_list = '-'.join(map(str, variables))
         directory_path = pathlib.Path(f'./era5_data/{variable_list}')
-        input_directory = pathlib.Path(f'{directory_path}/monthly_means/geotiffs/')
-        png_directory = pathlib.Path(f'{directory_path}/monthly_means/png/')
+        input_directory = pathlib.Path(f'{directory_path}/{input_dir}/geotiffs/')
+        png_directory = pathlib.Path(f'{directory_path}/{input_dir}/png/')
 
-        null_tiff = set_null_in_raster(input_directory, f"mean_{period}", period)
-        res_tiff = resample_raster(input_directory, f"mean_{period}_NULL", 0.018, period)
+        month = period[4:6]
+        input_path_suffix = f"month{month}_{period}"
+    
+        # Anomaly Check
+        if input_dir == "monthly_anomalies":
+            input_path_name = f"anomaly_{input_path_suffix}"
+        elif input_dir == "monthly_means":
+            input_path_name = f"mean_{input_path_suffix}"
 
-        create_raster_image(period, res_tiff, png_directory)
+        null_tiff = set_null_in_raster(input_directory, input_path_name)
+        res_tiff = resample_raster(input_directory, f"{input_path_name}_NULL", 0.018)
+        create_raster_image(period, res_tiff, png_directory, input_path_name)
 
     qgs.exitQgis()
 
 
-def set_null_in_raster(in_dir, in_filename, period):
+def set_null_in_raster(in_dir, in_filename):
     """
     Set missing values in a raster to NULL.
 
@@ -105,7 +113,7 @@ def set_null_in_raster(in_dir, in_filename, period):
     return null_tiff
 
 
-def resample_raster(in_dir, in_filename, resolution, period):
+def resample_raster(in_dir, in_filename, resolution):
     """
     Resample a raster to a higher resolution.
 
@@ -151,7 +159,7 @@ def resample_raster(in_dir, in_filename, resolution, period):
     return res_tiff
 
 
-def create_raster_image(period, raster_path, image_directory):
+def create_raster_image(period, raster_path, image_directory, input_path_name):
     """
     Create a raster image.
 
@@ -164,12 +172,12 @@ def create_raster_image(period, raster_path, image_directory):
         None
     """
     shapefile_path = pathlib.Path(f"./shpfiles/world_map/ne_10m_land.shp")
-    output_png_path = os.path.join(image_directory, f"mean_{period}_NULL_res.png")
+    output_png_path = os.path.join(image_directory, f"{input_path_name}_NULL_res.png")
     if pathlib.Path(output_png_path).exists():
         print(f"\t\tData for the period has already been imaged.")
     else:
         os.makedirs(image_directory, exist_ok=True)
-        apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path, period)
+        apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path, input_path_name)
         print(f"\t\tData for the period has been imaged.")
 
 
@@ -189,10 +197,12 @@ def create_color_ramp_renderer(raster_layer):
     stats = data_provider.bandStatistics(band, QgsRasterBandStats.All, raster_layer.extent(), 0)
     min_value = stats.minimumValue
     max_value = stats.maximumValue
-    cutoffs = [min_value,
-               min_value + 0.33 * (max_value - min_value),
-               min_value + 0.66 * (max_value - min_value),
-               max_value]
+    #cutoffs = [min_value,
+    #           min_value + 0.33 * (max_value - min_value),
+    #           min_value + 0.66 * (max_value - min_value),
+    #           max_value]
+
+    cutoffs = [-20, -10, 0, 10, 20]
 
     # Create and Apply Color Ramp Shader
     raster_shader = QgsRasterShader()
@@ -211,68 +221,24 @@ def create_color_ramp_renderer(raster_layer):
     # default blue: (43, 131, 186)
     
     color_ramp = [
-        QgsColorRampShader.ColorRampItem(cutoffs[0], QColor(43, 131, 186), f'{cutoffs[2]:.2f}'),  # Default Blue: 43, 131, 186
+        QgsColorRampShader.ColorRampItem(cutoffs[0], QColor(43, 131, 186), f'{cutoffs[0]:.2f}'),  # Default Blue: 43, 131, 186
         QgsColorRampShader.ColorRampItem(cutoffs[1], QColor(171, 221, 164), f'{cutoffs[1]:.2f}'),  # Default Light Green: 171, 221, 164
-        QgsColorRampShader.ColorRampItem(cutoffs[2], QColor(255, 192, 13), f'{cutoffs[1]:.2f}'),  # Evan Yellow: 255, 192, 13
-        QgsColorRampShader.ColorRampItem(cutoffs[3], QColor(249, 88, 8), f'{cutoffs[0]:.2f}'),  # Evan Orange-Red: 249, 88, 8
+        QgsColorRampShader.ColorRampItem(cutoffs[2], QColor(255, 255, 191), f'{cutoffs[2]:.2f}'),  # Default Yellow: 255, 255, 191
+        QgsColorRampShader.ColorRampItem(cutoffs[3], QColor(253, 174, 97), f'{cutoffs[3]:.2f}'),  # Default Orange: 253, 174, 97
+        QgsColorRampShader.ColorRampItem(cutoffs[4], QColor(249, 88, 8), f'{cutoffs[4]:.2f}'),  # Evan Orange-Red: 249, 88, 8
     ]
 
     color_ramp_shader.setColorRampItemList(color_ramp)
     raster_shader.setRasterShaderFunction(color_ramp_shader)
     renderer = QgsSingleBandPseudoColorRenderer(data_provider, band, raster_shader)
+    
+    # Set the color for "no data" values to grey
+    # renderer.setNodataColor(QColor(128, 128, 128))  # Grey color for no data values
+    
     return renderer
 
 
-def mask_raster_with_shapefile(raster_path, shapefile_path, period):
-    """
-    Mask a raster with a shapefile.
-
-    Parameters:
-        raster_path (str): Path to the raster file.
-        shapefile_path (str): Path to the shapefile for masking.
-        period (str): The period for which the raster is being processed.
-
-    Returns:
-        str: Path to the masked raster file.
-    """
-    print("\tMasking raster with shapefile...")
-
-    # Load the raster layer
-    raster_layer = QgsRasterLayer(raster_path, "Resampled Raster")
-    raster_dir = os.path.dirname(raster_path)
-    masked_path = os.path.join(raster_dir, f"mean_{period}_NULL_res_mask.tif")
-    if not raster_layer.isValid():
-        print("\t\tFailed to load the raster layer.")
-        return
-
-    # Load the shapefile layer
-    shapefile_layer = QgsVectorLayer(str(shapefile_path), "Mask Layer", "ogr")
-    if not shapefile_layer.isValid():
-        print("\t\tFailed to load the shapefile layer.")
-        return
-
-    # Mask the raster with the shapefile
-    mask_layer = QgsRasterCalculatorEntry()
-    mask_layer.ref = "mask@1"
-    mask_layer.raster = raster_layer
-    mask_layer.bandNumber = 1
-
-    entries = [mask_layer]
-    calc = QgsRasterCalculator(
-        f"({mask_layer.ref} > 0) * {raster_layer.name()}",
-        str(masked_path),
-        "GTiff",
-        raster_layer.extent(),
-        raster_layer.width(),
-        raster_layer.height(),
-        entries
-    )
-    calc.processCalculation()
-
-    return masked_path
-
-
-def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path, period):
+def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path, input_path_name):
     """
     Apply single pseudocolor symbology to the raster and mask it with a shapefile before exporting as PNG.
 
@@ -299,9 +265,12 @@ def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path,
         print("\t\tFailed to load the shapefile layer.")
         return
 
+    # Set fill color to transparent for the shapefile layer
+    shapefile_layer.renderer().symbol().setColor(QColor(0, 0, 0, 0))
+
     # Mask the raster with the shapefile
     raster_dir = os.path.dirname(raster_path)
-    masked_path = os.path.join(raster_dir, f"mean_{period}_NULL_res_mask.tif")
+    masked_path = os.path.join(raster_dir, f"{input_path_name}_NULL_res_mask.tif")
     processing.run("gdal:cliprasterbymasklayer", {'INPUT': raster_layer,
                                                   'MASK': shapefile_layer,
                                                   'OUTPUT': masked_path})
@@ -312,14 +281,20 @@ def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path,
     masked_layer.setRenderer(renderer)
     masked_layer.triggerRepaint()
 
+    base_ratio_x = 800
+    base_ratio_y = 600
+
+    final_ratio_x = base_ratio_x * 10
+    final_ratio_y = base_ratio_y * 10
+
     # Create a QgsMapSettings object
     map_settings = QgsMapSettings()
-    map_settings.setLayers([masked_layer, shapefile_layer])
+    map_settings.setLayers([shapefile_layer, masked_layer])
     map_settings.setExtent(masked_layer.extent())
-    map_settings.setOutputSize(QSize(800, 600))
+    map_settings.setOutputSize(QSize(final_ratio_x, final_ratio_y))  # Increase the output size to twice the current size
 
     # Create a QgsMapRendererCustomPainterJob object
-    image = QImage(QSize(800, 600), QImage.Format_ARGB32_Premultiplied)
+    image = QImage(QSize(final_ratio_x, final_ratio_y), QImage.Format_ARGB32_Premultiplied)  # Increase the image size to match the output size
     image.fill(Qt.white)
     painter = QPainter(image)
     job = QgsMapRendererCustomPainterJob(map_settings, painter)
