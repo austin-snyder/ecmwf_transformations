@@ -1,7 +1,10 @@
-import xarray as xr
-import rioxarray
+# Standard libraries
 import os
 import pathlib
+
+# Third-party libraries
+import xarray as xr
+import rioxarray
 
 
 def netcdf_to_geotiff(variables, periods, input_dir):
@@ -10,6 +13,8 @@ def netcdf_to_geotiff(variables, periods, input_dir):
 
     Parameters:
         variables (list): List of variables to be converted from NetCDF to GeoTIFF.
+        periods (list): List of periods to process.
+        input_dir (str): Input directory.
 
     Returns:
         None
@@ -27,7 +32,7 @@ def netcdf_to_geotiff(variables, periods, input_dir):
             input_path_suffix = f"{period}"
         else:
             input_path_suffix = f"month{month}_{period}"
-        
+
         # Anomaly Check
         if input_dir == "monthly_anomalies":
             input_path_name = f"anomaly_{input_path_suffix}"

@@ -1,3 +1,4 @@
+# Local Scripts
 import download
 import process
 import convert
@@ -5,10 +6,8 @@ import qgis_transform
 import longterm_averaging
 import anomaly_calc
 
-# Importing the required modules
-
 # Define parameters for the API request
-years = ["2022"]
+years = ["2016","2017","2018","2019"]
 #months = ["01"]
 months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 variables = ["ssrd"]
@@ -17,13 +16,13 @@ variables = ["ssrd"]
 periods = download.batch_download(variables,years,months)
 
 # monthly averaging
-# process.average_netcdfs(variables, periods)
-# convert.netcdf_to_geotiff(variables, periods, "monthly_means")
-# qgis_transform.init_qgis(variables, periods, "monthly_means")
+process.average_netcdfs(variables, periods)
+convert.netcdf_to_geotiff(variables, periods, "monthly_means")
+qgis_transform.init_qgis(variables, periods, "monthly_means")
 
 # longterm averaging
-longterm_averaging.create_longterm_average(variables, months)
-anomaly_calc.calculate_anomaly(variables, periods, months)
-convert.netcdf_to_geotiff(variables, periods, "monthly_anomalies")
-qgis_transform.init_qgis(variables, periods, months, "monthly_anomalies")
+# longterm_averaging.create_longterm_average(variables, months)
+# anomaly_calc.calculate_anomaly(variables, periods, months)
+# convert.netcdf_to_geotiff(variables, periods, "monthly_anomalies")
+# qgis_transform.init_qgis(variables, periods, "monthly_anomalies")
 

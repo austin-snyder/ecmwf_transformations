@@ -24,13 +24,14 @@ from PyQt5.QtGui import QImage, QPainter, QColor
 from PyQt5.QtCore import QSize, Qt
 
 
-def init_qgis(variables, periods, months, input_dir):
+def init_qgis(variables, periods, input_dir):
     """
     Initialize the QGIS application.
 
     Parameters:
         variables (list): List of variables.
         periods (list): List of periods.
+        input_dir (str): Input directory.
 
     Returns:
         None
@@ -52,7 +53,7 @@ def init_qgis(variables, periods, months, input_dir):
 
         month = period[4:6]
         input_path_suffix = f"month{month}_{period}"
-    
+
         # Anomaly Check
         if input_dir == "monthly_anomalies":
             input_path_name = f"anomaly_{input_path_suffix}"
@@ -73,7 +74,6 @@ def set_null_in_raster(in_dir, in_filename):
     Parameters:
         in_dir (str): The input directory containing the raster file.
         in_filename (str): The input filename of the raster file.
-        period (str): The period for which the raster is being processed.
 
     Returns:
         str: Path to the new raster file with NULL values set.
@@ -121,7 +121,6 @@ def resample_raster(in_dir, in_filename, resolution):
         in_dir (str): The input directory containing the raster file.
         in_filename (str): The input filename of the raster file.
         resolution (float): The target resolution for resampling.
-        period (str): The period for which the raster is being processed.
 
     Returns:
         str: Path to the resampled raster file.
@@ -167,6 +166,7 @@ def create_raster_image(period, raster_path, image_directory, input_path_name):
         period (str): The period for which the raster is being processed.
         raster_path (str): Path to the raster file.
         image_directory (str): Directory to save the output image.
+        input_path_name (str): Input path name.
 
     Returns:
         None
@@ -197,10 +197,10 @@ def create_color_ramp_renderer(raster_layer):
     stats = data_provider.bandStatistics(band, QgsRasterBandStats.All, raster_layer.extent(), 0)
     min_value = stats.minimumValue
     max_value = stats.maximumValue
-    #cutoffs = [min_value,
-    #           min_value + 0.33 * (max_value - min_value),
-    #           min_value + 0.66 * (max_value - min_value),
-    #           max_value]
+    # cutoffs = [min_value,
+    #            min_value + 0.33 * (max_value - min_value),
+    #            min_value + 0.66 * (max_value - min_value),
+    #            max_value]
 
     cutoffs = [-20, -10, 0, 10, 20]
 
@@ -219,22 +219,22 @@ def create_color_ramp_renderer(raster_layer):
     # default yellow: (255, 255, 191)
     # default light green: (171, 221, 164)
     # default blue: (43, 131, 186)
-    
+
     color_ramp = [
         QgsColorRampShader.ColorRampItem(cutoffs[0], QColor(43, 131, 186), f'{cutoffs[0]:.2f}'),  # Default Blue: 43, 131, 186
         QgsColorRampShader.ColorRampItem(cutoffs[1], QColor(171, 221, 164), f'{cutoffs[1]:.2f}'),  # Default Light Green: 171, 221, 164
         QgsColorRampShader.ColorRampItem(cutoffs[2], QColor(255, 255, 191), f'{cutoffs[2]:.2f}'),  # Default Yellow: 255, 255, 191
         QgsColorRampShader.ColorRampItem(cutoffs[3], QColor(253, 174, 97), f'{cutoffs[3]:.2f}'),  # Default Orange: 253, 174, 97
-        QgsColorRampShader.ColorRampItem(cutoffs[4], QColor(249, 88, 8), f'{cutoffs[4]:.2f}'),  # Evan Orange-Red: 249, 88, 8
+        QgsColorRampShader.ColorRampItem(cutoffs[4], QColor(249, 88, 8), f'{cutoffs[4]:.2f}')  # Evan Orange-Red: 249, 88, 8
     ]
 
     color_ramp_shader.setColorRampItemList(color_ramp)
     raster_shader.setRasterShaderFunction(color_ramp_shader)
     renderer = QgsSingleBandPseudoColorRenderer(data_provider, band, raster_shader)
-    
+
     # Set the color for "no data" values to grey
     # renderer.setNodataColor(QColor(128, 128, 128))  # Grey color for no data values
-    
+
     return renderer
 
 
@@ -246,7 +246,7 @@ def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path,
         raster_path (str): Path to the raster file.
         shapefile_path (str): Path to the shapefile for masking.
         output_png_path (str): Path to save the output PNG file.
-        period (str): The period for which the raster is being processed.
+        input_path_name (str): Input path name.
 
     Returns:
         None
@@ -271,9 +271,10 @@ def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path,
     # Mask the raster with the shapefile
     raster_dir = os.path.dirname(raster_path)
     masked_path = os.path.join(raster_dir, f"{input_path_name}_NULL_res_mask.tif")
-    processing.run("gdal:cliprasterbymasklayer", {'INPUT': raster_layer,
-                                                  'MASK': shapefile_layer,
-                                                  'OUTPUT': masked_path})
+    processing.run(
+        "gdal:cliprasterbymasklayer",
+        {'INPUT': raster_layer, 'MASK': shapefile_layer, 'OUTPUT': masked_path}
+    )
 
     masked_layer = QgsRasterLayer(masked_path, "Masked Raster")
 
