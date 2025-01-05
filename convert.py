@@ -28,7 +28,7 @@ def netcdf_to_geotiff(variables, periods, input_dir):
     for period in periods:
         month = period[4:6]
         # Month Check
-        if month == "":
+        if month == "" or input_dir == "monthly_means":
             input_path_suffix = f"{period}"
         else:
             input_path_suffix = f"month{month}_{period}"

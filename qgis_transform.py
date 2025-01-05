@@ -36,7 +36,7 @@ def init_qgis(variables, periods, input_dir):
     Returns:
         None
     """
-    print("\tInitializing QGIS...")
+    print("Initializing QGIS...")
     qgs = QgsApplication([], False)
     qgs.initQgis()
     from processing.core.Processing import Processing
@@ -52,7 +52,10 @@ def init_qgis(variables, periods, input_dir):
         png_directory = pathlib.Path(f'{directory_path}/{input_dir}/png/')
 
         month = period[4:6]
-        input_path_suffix = f"month{month}_{period}"
+        if (month == "") or (input_dir == "monthly_means"):
+            input_path_suffix = f"{period}"
+        else:
+            input_path_suffix = f"month{month}_{period}"
 
         # Anomaly Check
         if input_dir == "monthly_anomalies":
@@ -62,7 +65,7 @@ def init_qgis(variables, periods, input_dir):
 
         null_tiff = set_null_in_raster(input_directory, input_path_name)
         res_tiff = resample_raster(input_directory, f"{input_path_name}_NULL", 0.018)
-        create_raster_image(period, res_tiff, png_directory, input_path_name)
+        create_raster_image(res_tiff, png_directory, input_path_name)
 
     qgs.exitQgis()
 
@@ -89,8 +92,7 @@ def set_null_in_raster(in_dir, in_filename):
         return null_tiff
 
     print("\t\tLoading raster...")
-    # Open the raster file
-    dataset = gdal.Open(input_tiff, gdal.GA_Update)  # Open in update mode
+    dataset = gdal.Open(input_tiff, gdal.GA_Update)  # Open the raster file in update mode
 
     if dataset is None:
         print("\t\tFailed to open the raster file.")
@@ -98,9 +100,7 @@ def set_null_in_raster(in_dir, in_filename):
 
     # Get the single raster band
     band = dataset.GetRasterBand(1)  # Band index is 1 for the first (and only) band
-
-    # Set the NoData value
-    band.SetNoDataValue(-9999)
+    band.SetNoDataValue(-9999) # set the NoData value for the band
     print("\t\tNoData value set to -9999 for the single band.")
 
     # Flush changes and close the dataset
@@ -158,12 +158,11 @@ def resample_raster(in_dir, in_filename, resolution):
     return res_tiff
 
 
-def create_raster_image(period, raster_path, image_directory, input_path_name):
+def create_raster_image(raster_path, image_directory, input_path_name):
     """
     Create a raster image.
 
     Parameters:
-        period (str): The period for which the raster is being processed.
         raster_path (str): Path to the raster file.
         image_directory (str): Directory to save the output image.
         input_path_name (str): Input path name.
@@ -181,7 +180,7 @@ def create_raster_image(period, raster_path, image_directory, input_path_name):
         print(f"\t\tData for the period has been imaged.")
 
 
-def create_color_ramp_renderer(raster_layer):
+def create_color_ramp_renderer(raster_layer, input_path_name):
     """
     Create a color ramp renderer for the raster layer.
 
@@ -202,7 +201,14 @@ def create_color_ramp_renderer(raster_layer):
     #            min_value + 0.66 * (max_value - min_value),
     #            max_value]
 
-    cutoffs = [-20, -10, 0, 10, 20]
+    if (input_path_name).startswith("anomaly"):
+        cutoffs = [-20, -10, 0, 10, 20]
+    elif (input_path_name).startswith("mean"):
+        cutoffs = [min_value,
+                   min_value + 0.25 * (max_value - min_value),
+                   min_value + 0.5 * (max_value - min_value),
+                   min_value + 0.75 * (max_value - min_value),
+                   max_value]
 
     # Create and Apply Color Ramp Shader
     raster_shader = QgsRasterShader()
@@ -278,7 +284,7 @@ def apply_symbology_and_export_png(raster_path, shapefile_path, output_png_path,
 
     masked_layer = QgsRasterLayer(masked_path, "Masked Raster")
 
-    renderer = create_color_ramp_renderer(masked_layer)
+    renderer = create_color_ramp_renderer(masked_layer, input_path_name)
     masked_layer.setRenderer(renderer)
     masked_layer.triggerRepaint()
 

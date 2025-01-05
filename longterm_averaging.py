@@ -16,15 +16,11 @@ def create_longterm_average(variables, months):
     Returns:
         None
     """
-    # Directory path
-    variable_list = '-'.join(map(str, variables))
-    input_directory = pathlib.Path(f'./era5_data/{variable_list}/downloads/')
-    output_directory = pathlib.Path(f'./era5_data/{variable_list}/long-term_averages/')
-    output_filename_prefix = "lt_average"
-    # months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-
-    # Directory containing the NetCDF files
-    output_file = os.path.join(output_directory, output_filename_prefix + ".nc")
+    # Set the IO directories and filenames
+    variable_list = '-'.join(map(str, variables)) # join the variables into a string
+    input_directory = pathlib.Path(f'./era5_data/{variable_list}/downloads/') # define the input directory
+    output_directory = pathlib.Path(f'./era5_data/{variable_list}/long-term_averages/') # define the output directory
+    output_filename_prefix = "lt_average" # define the output filename prefix
 
     # Loop through all files in the directory
     print("Calculating the long-term average for each month...")
@@ -47,6 +43,8 @@ def multi_average(month, input_directory, output_directory, output_filename_pref
     Returns:
         None
     """
+
+    # Define the file pattern and output file path based on the month
     if month == "":
         file_pattern = os.path.join(input_directory, "*_to_*")
         output_filepath = os.path.join(output_directory, f"{output_filename_prefix}")
@@ -54,11 +52,8 @@ def multi_average(month, input_directory, output_directory, output_filename_pref
         file_pattern = os.path.join(input_directory, f"download_????{month}??_to_*")
         output_filepath = os.path.join(output_directory, f"{output_filename_prefix}_{month}")
 
-    # Open multiple NetCDF files and combine along the time dimension
-    dataset = xr.open_mfdataset(file_pattern + ".nc", combine="by_coords")
-
-    # Calculate the monthly mean along the time dimension
-    monthly_mean = dataset.mean(dim="valid_time", skipna=True)
+    dataset = xr.open_mfdataset(file_pattern + ".nc", combine="by_coords") # open all NetCDF files to be averaged
+    monthly_mean = dataset.mean(dim="valid_time", skipna=True) # calculate monthly mean along the time dimension
 
     # Save the resulting dataset to a new NetCDF file
     if pathlib.Path(output_filepath + ".nc").exists() and pathlib.Path(output_filepath + ".tif").exists():
@@ -69,17 +64,13 @@ def multi_average(month, input_directory, output_directory, output_filename_pref
         monthly_mean.to_netcdf(output_filepath + ".nc")
         print(f"\t\tData for the month {month} has been averaged in the long-term.")
 
-    monthly_mean.coords['longitude'] = (monthly_mean.coords['longitude'] + 180) % 360 - 180
-    monthly_mean = monthly_mean.sortby(monthly_mean.longitude)
-    # Select the variable to export
-    variable = monthly_mean["ssrd"]
-
-    # Set spatial reference
-    variable = variable.rio.write_crs("EPSG:4326")  # Replace with your CRS if known
-
-    os.makedirs(output_directory, exist_ok=True)
-    # output_geotiff_path = output_directory / f"{output_filename_prefix}.tif"
+    # Conduct necessary conversions to NetCDF file to export to GeoTIFF
+    monthly_mean.coords['longitude'] = (monthly_mean.coords['longitude'] + 180) % 360 - 180 # shift the longitude values
+    monthly_mean = monthly_mean.sortby(monthly_mean.longitude) # sort the longitude values
+    variable = monthly_mean["ssrd"] # select variable to export to GeoTIFF
+    variable = variable.rio.write_crs("EPSG:4326")  # set spacial reference to WGS84
 
     # Export to GeoTIFF
+    os.makedirs(output_directory, exist_ok=True)
     variable.rio.to_raster(output_filepath + ".tif")
     print(f"\t\tData for the month {month} has been converted to GeoTIFF format!")

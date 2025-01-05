@@ -31,14 +31,9 @@ def multi_anomaly(periods, longterm_directory, monthly_directory, anomaly_direct
     for period in periods:
         month = period[4:6]
 
-        anomaly_path_stem = f"anomaly_{period}"
-        anomaly_path = anomaly_directory / f"{anomaly_path_stem}.nc"
-
-        monthly_path_stem = f"mean_{period}"
-        monthly_path = monthly_directory / f"{monthly_path_stem}.nc"
-
-        longterm_path_stem = f"lt_average_{month}"
-        longterm_path = longterm_directory / f"{longterm_path_stem}.nc"
+        anomaly_path = anomaly_directory / f"anomaly_{period}.nc"
+        monthly_path = monthly_directory / f"mean_{period}.nc"
+        longterm_path = longterm_directory / f"lt_average_{month}.nc"
 
         if month == "":
             longterm_path = os.path.join(longterm_directory, "lt_average.nc")
@@ -47,18 +42,13 @@ def multi_anomaly(periods, longterm_directory, monthly_directory, anomaly_direct
             longterm_path = os.path.join(longterm_directory, f"lt_average_{month}.nc")
             output_file_path = os.path.join(anomaly_directory, f"anomaly_month{month}_{period}.nc")
 
-        # Open the NetCDF files using xarray
+        # Open the NetCDF files using xarray and calculate anomaly
         longterm_avg = xr.open_dataset(longterm_path)
         monthly_mean = xr.open_dataset(monthly_path)
-
-        # Read the data variables
         longterm_avg_data = longterm_avg['ssrd']
-        monthly_mean_data = monthly_mean['ssrd']
-
-        # Calculate the percentage difference
-        anomaly = ((monthly_mean_data - longterm_avg_data) / longterm_avg_data) * 100
+        monthly_mean_data = monthly_mean['ssrd'] 
+        anomaly = ((monthly_mean_data - longterm_avg_data) / longterm_avg_data) * 100 # calculate the percentage difference
 
         # Create the output NetCDF file
         anomaly.to_netcdf(output_file_path)
-
         print(f"Percentage difference saved to {output_file_path}")
